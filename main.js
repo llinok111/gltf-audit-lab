@@ -343,6 +343,8 @@ async function loadBytes(bytes, name) {
   const parsed = parseAsset(bytes);
   current = { name, bytes, parsed, result };
   buildModel(parsed, result);
+  els.btnDeg.classList.toggle('active', degenerateOverlays.length > 0);
+  els.btnDeg.disabled = degenerateOverlays.length === 0;
   applyWireframe();
   frameObject(modelRoot);
   renderPanel(result, name);
@@ -371,7 +373,8 @@ els.btnWire.addEventListener('click', () => {
   applyWireframe();
 });
 els.btnDeg.addEventListener('click', () => {
-  const on = !degenerateOverlays[0]?.visible;
+  if (!degenerateOverlays.length) return;
+  const on = !degenerateOverlays[0].visible;
   degenerateOverlays.forEach((o) => { o.visible = on; });
   els.btnDeg.classList.toggle('active', on);
 });
