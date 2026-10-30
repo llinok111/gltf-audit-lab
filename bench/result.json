@@ -1,0 +1,24 @@
+{
+  "asset": "procedural 420x420 grid",
+  "bytes": 8447832,
+  "megabytes": 8.06,
+  "vertices": 176400,
+  "triangles": 351122,
+  "runs": [
+    27.993,
+    22.62,
+    21.832,
+    22.154,
+    21.671,
+    30.869,
+    31.745
+  ],
+  "runsCount": 7,
+  "medianMs": 22.62,
+  "minMs": 21.67,
+  "maxMs": 31.75,
+  "throughputMBs": 356.2,
+  "trianglesPerSecond": 15522635,
+  "findingsOnBenchAsset": 0,
+  "generatedAt": "2026-10-30T08:43:25.488Z"
+}

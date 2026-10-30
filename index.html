@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>glTF Audit Lab — find the defects the viewer hides</title>
+<style>
+  :root {
+    --bg: #0a0d12; --panel: #10151d; --panel-2: #151c26; --line: #232d3b;
+    --text: #dfe7f2; --muted: #8a99ad; --accent: #4fd1c5; --err: #ff5d6c;
+    --warn: #ffb454; --info: #6aa9ff; --ok: #59d98e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { display: grid; grid-template-columns: 1fr 420px; overflow: hidden; }
+  #viewport { position: relative; min-width: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .hud { position: absolute; top: 16px; left: 16px; pointer-events: none; }
+  .hud h1 { margin: 0; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+  .hud p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+  .hud .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  #fps { position: absolute; bottom: 14px; left: 16px; font: 11px ui-monospace, monospace;
+    color: var(--muted); pointer-events: none; }
+
+  .toolbar { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; }
+  button { font: 12px ui-sans-serif, system-ui; color: var(--text); background: #1a2330;
+    border: 1px solid var(--line); border-radius: 7px; padding: 7px 11px; cursor: pointer; }
+  button:hover { border-color: #3a4b60; background: #202b3a; }
+  button.active { border-color: var(--accent); color: var(--accent); }
+
+  aside { border-left: 1px solid var(--line); background: var(--panel); display: flex;
+    flex-direction: column; min-height: 0; }
+  .brand { padding: 16px 18px 12px; border-bottom: 1px solid var(--line); }
+  .brand h2 { margin: 0; font-size: 16px; }
+  .brand span { font-size: 11.5px; color: var(--muted); }
+
+  .tabs { display: flex; gap: 6px; padding: 12px 18px 0; }
+  .tabs button { flex: 1; }
+  .verdict { margin: 14px 18px 0; padding: 12px 14px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel-2); }
+  .verdict .big { font-size: 20px; font-weight: 650; letter-spacing: -.01em; }
+  .verdict .sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .verdict.bad { border-color: #4a2229; background: #1c1216; }
+  .verdict.good { border-color: #1e4132; background: #0f1a16; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 14px 18px;
+    background: var(--line); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .stat { background: var(--panel); padding: 9px 11px; }
+  .stat b { display: block; font: 13.5px ui-monospace, monospace; color: var(--text); }
+  .stat span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+
+  .listhead { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 0 18px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+  #issues { list-style: none; margin: 0; padding: 0 12px 18px; overflow-y: auto; flex: 1; min-height: 0; }
+  #issues li { display: grid; grid-template-columns: 8px 1fr; gap: 10px; padding: 9px 10px;
+    border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+  #issues li:hover { background: var(--panel-2); border-color: var(--line); }
+  #issues li.sel { border-color: var(--accent); background: #10201f; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .dot.error { background: var(--err); } .dot.warning { background: var(--warn); } .dot.info { background: var(--info); }
+  .code { font: 12px ui-monospace, monospace; color: var(--text); }
+  .code em { font-style: normal; color: var(--muted); font-size: 10.5px; margin-left: 6px; }
+  .msg { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .where { font: 10.5px ui-monospace, monospace; color: #5c6b80; margin-top: 3px; }
+  .empty { color: var(--muted); font-size: 12.5px; padding: 8px 10px; }
+
+  #drop { position: absolute; inset: 0; display: none; place-items: center; background: #0a0d12e6;
+    border: 2px dashed var(--accent); font-size: 15px; color: var(--accent); z-index: 5; }
+  #drop.on { display: grid; }
+  #boot { position: absolute; inset: 0; display: none; place-items: center; padding: 30px;
+    text-align: center; color: var(--warn); font-size: 13px; background: #0a0d12; z-index: 9; }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; grid-template-rows: 55% 45%; } aside { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="viewport">
+    <div class="hud">
+      <h1>glTF Audit Lab</h1>
+      <p class="mono" id="assetLine">loading…</p>
+    </div>
+    <div class="toolbar">
+      <button id="btnWire">Wireframe</button>
+      <button id="btnDeg" class="active">Degenerate overlay</button>
+      <button id="btnFrame">Frame</button>
+    </div>
+    <div id="fps">—</div>
+    <div id="drop">Drop a .glb to audit it locally</div>
+    <div id="boot"></div>
+  </div>
+
+  <aside>
+    <div class="brand">
+      <h2>Integrity report</h2>
+      <span>Parsed in this tab. Nothing is uploaded.</span>
+    </div>
+    <div class="tabs">
+      <button id="tabGood">good.glb</button>
+      <button id="tabBroken" class="active">broken.glb</button>
+      <button id="btnOpen">Open…</button>
+      <input id="file" type="file" accept=".glb,.gltf" hidden />
+    </div>
+    <div class="verdict" id="verdict">
+      <div class="big">—</div><div class="sub">waiting for asset</div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="listhead"><span>Findings</span><span id="counts">—</span></div>
+    <ul id="issues"></ul>
+  </aside>
+
+<script>
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('boot');
+    el.style.display = 'grid';
+    el.textContent = 'Failed to start: ' + (e.message || e.error) + ' — three.js is loaded from cdn.jsdelivr.net; check network access.';
+  });
+</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "gltf-audit-lab",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Audit a GLB in the browser and in Node: accessor bounds, index range, degenerate triangles, unit normals, hierarchy cycles, Z-up and unit-scale mistakes.",
+  "scripts": {
+    "verify": "node bench/verify.mjs",
+    "bench": "node bench/bench.mjs",
+    "fixtures": "node tools/make-fixtures.mjs",
+    "serve": "python3 -m http.server 4173"
+  }
+}
